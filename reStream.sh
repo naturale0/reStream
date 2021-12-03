@@ -5,7 +5,7 @@ version="1.2.0"
 
 # default values for arguments
 remarkable="10.11.99.1"   # remarkable connected through USB
-landscape=true            # rotate 90 degrees to the right
+landscape=false           # rotate 90 degrees to the right
 output_path=-             # display output through ffplay
 format=-                  # automatic output format
 webcam=false              # not to a webcam
@@ -14,6 +14,7 @@ measure_throughput=false  # measure how fast data is being transferred
 window_title=reStream     # stream window title is reStream
 video_filters=""          # list of ffmpeg filters to apply
 unsecure_connection=false # Establish a unsecure connection that is faster
+identity_file=""          # SSH id file
 
 # loop through arguments and process them
 while [ $# -gt 0 ]; do
@@ -22,8 +23,8 @@ while [ $# -gt 0 ]; do
             echo "reStream version: v$version"
             exit
             ;;
-        -p | --portrait)
-            landscape=false
+        -l | --landscape)
+            landscape=true
             shift
             ;;
         -s | --source)
@@ -80,12 +81,18 @@ while [ $# -gt 0 ]; do
             unsecure_connection=true
             shift
             ;;
+        -i | --identity-file)
+            identity_file="$2"
+            shift
+            shift
+            ;;
         -h | --help | *)
-            echo "Usage: $0 [-p] [-u] [-s <source>] [-o <output>] [-f <format>] [-t <title>] [-m] [-w] [--hflip]"
+            echo "Usage: $0 [-l] [-u] [-s <source>] [-i <IdentityFile>] [-o <output>] [-f <format>] [-t <title>] [-m] [-w] [--hflip]"
             echo "Examples:"
-            echo "	$0                              # live view in landscape"
-            echo "	$0 -p                           # live view in portrait"
+            echo "	$0                              # live view in portrait"
+            echo "	$0 -l                           # live view in landscape"
             echo "	$0 -s 192.168.0.10              # connect to different IP"
+            echo "	$0 -i IdentityFile              # SSH identity file"
             echo "	$0 -o remarkable.mp4            # record to a file"
             echo "	$0 -o udp://dest:1234 -f mpegts # record to a stream"
             echo "	$0 -w --mirror                  # write to a webcam (yuv420p + resize + mirror)"
@@ -97,11 +104,22 @@ done
 
 ssh_cmd() {
     echo "[SSH]" "$@" >&2
-    ssh -o ConnectTimeout=1 \
-        -o PasswordAuthentication=no \
-        -o PubkeyAcceptedKeyTypes=+ssh-rsa \
-        -o HostKeyAlgorithms=+ssh-rsa \
-        "root@$remarkable" "$@"
+
+    # use id file if provided
+    if [ "$identity_file" == "" ]; then
+        ssh -o ConnectTimeout=1 \
+            -o PasswordAuthentication=no \
+            -o PubkeyAcceptedKeyTypes=+ssh-rsa \
+            -o HostKeyAlgorithms=+ssh-rsa \
+            "root@$remarkable" "$@"
+    else
+        ssh -o ConnectTimeout=1 \
+            -o PasswordAuthentication=no \
+            -i "$identity_file" \
+            -o PubkeyAcceptedKeyTypes=+ssh-rsa \
+            -o HostKeyAlgorithms=+ssh-rsa \
+            "root@$remarkable" "$@"
+    fi
 }
 
 # kill reStream on remarkable at the end.
